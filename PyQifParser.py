@@ -3,6 +3,7 @@
 @author: Uwe Ziegenhagen, ziegenhagen@gmail.com
 """
 
+import toml
 import pandas as pd
 import numpy as np
 from Transaction import Transaction
@@ -10,10 +11,24 @@ from Classification import Classification
 from Category import Category
 from Account import Account
 
+import sqlalchemy
+
 t = Transaction()
 temp_classification = Classification()
 temp_category = Category()
 temp_account = Account()
+
+
+configuration = toml.load('settings.toml')
+
+db_database = configuration["database"]
+db_user = configuration["user"]
+db_password = configuration["password"]
+db_host=configuration["host"]
+
+database_connection = sqlalchemy.create_engine('mysql+mysqlconnector://{0}:{1}@{2}/{3}'.
+                                               format(db_user, db_password, 
+                                                      db_host, db_database))
 
 class PyQifParser():
     """
@@ -42,6 +57,7 @@ class PyQifParser():
             and 'Year' based on the transaction date
         """
         # add columns for Month and Year
+        self.transactions['Reference'] = self.transactions['Reference'].fillna(value=0)
         self.transactions['Year'] = self.transactions['Date'].dt.year
         self.transactions['Month'] = self.transactions['Date'].dt.month
         return self.transactions
@@ -49,14 +65,13 @@ class PyQifParser():
     def df_memberpayments(self, outputfile):
         """
             calculates a Pivot of payments from the transactions for
-            a specific year. This is specific for usage at Dingfabrik.de
+            a specific year. This is specific for usage at Dingfabrik
         """
         t = self.get_transactions()
-        t['Category'] = t['Category'].fillna('')
-        t = t[t['Category'].str.startswith('Mitgliedsbeitrag_2110')]
-        t['Mitglied'] = t['Category'].str.split("/",expand=True)[1].astype(int) #   + ' - ' + t['Payee'] 
-        t.to_clipboard()
+        t = t[t['Category'].str.startswith('Mitgliedsbeitrag_2110', na=False)]
+        t['Mitglied'] = t['Category'].str.split("/",expand=True)[1] # + ' - ' + t['Payee'] 
         table = pd.pivot_table(t, values='Amount', index=['Mitglied'], columns=['Year', 'Month'], aggfunc=np.sum)
+        # df['index1'] = df.index
         table.to_excel(outputfile)
     
     
@@ -223,7 +238,9 @@ class PyQifParser():
                     self.handle_other(line)
 
 
-p = PyQifParser(r'C:\Users\Uwe\Desktop\DF_Spendenbescheinigungen\2020\Buchungen2020.QIF')
+p = PyQifParser(r'C:\Users\Uwe\Nextcloud\WG\WG-Alles_20210321_145112.QIF')
 p.parse()
-p.df_memberpayments(r'E:\DF\pivot.xlsx')
-p.to_excel(r'C:\Users\Uwe\Desktop\DF_Spendenbescheinigungen\2020\DF_Buchungen.xlsx')
+#p.df_memberpayments(r'O:\DF\Pivot_Buchungen_2020.xlsx')
+p.to_excel(r'C:\Users\Uwe\Nextcloud\WG\WG-Aaa.xlsx')
+
+p.get_transactions().to_sql(con=database_connection, name='Buchungen', if_exists='replace')
