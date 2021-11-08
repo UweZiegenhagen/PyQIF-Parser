@@ -3,7 +3,7 @@
 @author: Uwe Ziegenhagen, ziegenhagen@gmail.com
 """
 
-import toml
+#import toml
 import pandas as pd
 import numpy as np
 from Transaction import Transaction
@@ -18,7 +18,7 @@ temp_classification = Classification()
 temp_category = Category()
 temp_account = Account()
 
-
+"""
 configuration = toml.load('settings.toml')
 
 db_database = configuration["database"]
@@ -29,6 +29,56 @@ db_host=configuration["host"]
 database_connection = sqlalchemy.create_engine('mysql+mysqlconnector://{0}:{1}@{2}/{3}'.
                                                format(db_user, db_password, 
                                                       db_host, db_database))
+"""
+
+def bc_kreddeb(category):
+    debkred = category.split('/')
+    if len(debkred) == 2:
+        debkred = debkred[1]
+    else:
+        debkred = ''
+    return debkred
+
+def bc_cat(category, line):
+    if 'Haushaltsgeld' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Haushaltsgeld' in category and line == 2:
+        return 'Vermoegen:Girokonto'
+    elif 'Lebensmittel' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Lebensmittel' in category and line == 2:
+        return 'Ausgaben:Lebensmittel'
+    elif 'Zahlungsverkehr' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Zahlungsverkehr' in category and line == 2:
+        return 'Ausgaben:Zahlungsverkehr'
+    elif 'Versicherungen' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Versicherungen' in category and line == 2:
+        return 'Ausgaben:Versicherungen'
+    elif 'Telekommunikation' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Telekommunikation' in category and line == 2:
+        return 'Ausgaben:Telekommunikation'
+    elif 'Friseur' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Friseur' in category and line == 2:
+        return 'Ausgaben:Friseur'
+    elif 'Fußpflege' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Fußpflege' in category and line == 2:
+        return 'Ausgaben:Fusspflege'
+    elif 'Zeitung' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Zeitung' in category and line == 2:
+        return 'Ausgaben:Zeitung'
+    elif 'Rundfunkgebühren' in category and line == 1:
+        return 'Vermoegen:Girokonto'
+    elif 'Rundfunkgebühren' in category and line == 2:
+        return 'Ausgaben:Rundfunkgebühren'
+    else:
+        return f'<u>{category}'
+
 
 class PyQifParser():
     """
@@ -96,7 +146,7 @@ class PyQifParser():
             self.classifications.to_excel(writer, sheet_name='Classifications', index=False)
             self.categories.to_excel(writer, sheet_name='Categories', index=False)
             writer.save()
-            
+
 
     def to_beancount(self, outputfile):
         """
@@ -105,11 +155,12 @@ class PyQifParser():
             @TODO: waits for detailed specifications, currency is still hardwired
         """
         self.transactions['bcdate'] = self.transactions['Date'].dt.strftime('%Y-%m-%d')
-        with open(outputfile, "w", encoding="utf-8") as writer:
+        with open(outputfile, "w") as writer:
             for entry in self.transactions.index: 
+                bc_cat(self.transactions['Category'][entry],1)
                 writer.write(self.transactions['bcdate'][entry] + ' * "' + str(self.transactions['Description'][entry])[:50]  + '"\n')
-                writer.write('\t' + self.transactions['Category'][entry] + '\t'*10 +  str(self.transactions['Amount'][entry]) + ' EUR\n')
-                writer.write('\t' + self.transactions['Category'][entry] + '\t'*10 +  str(-1 * self.transactions['Amount'][entry]) + ' EUR\n\n')
+                writer.write('\t' + bc_cat(self.transactions['Category'][entry],1) + '\t'*10 +  str(self.transactions['Amount'][entry]) + ' EUR\n')
+                writer.write('\t' + bc_cat(self.transactions['Category'][entry],2) + '\t'*10 +  str(-1 * self.transactions['Amount'][entry]) + ' EUR\n\n')
                 
             
 
@@ -238,9 +289,10 @@ class PyQifParser():
                     self.handle_other(line)
 
 
-p = PyQifParser(r'C:\Users\Uwe\Nextcloud\WG\WG-Alles_20210321_145112.QIF')
+p = PyQifParser(r'C:\Users\ziege\Nextcloud\WG-Alles_20210321_145112.QIF')
 p.parse()
 #p.df_memberpayments(r'O:\DF\Pivot_Buchungen_2020.xlsx')
-p.to_excel(r'C:\Users\Uwe\Nextcloud\WG\WG-Aaa.xlsx')
+#p.to_excel(r'C:\Users\Uwe\Nextcloud\WG\WG-Aaa.xlsx')
+p.to_beancount('C:/Users/ziege/Nextcloud/WG-Alles_20211108.bean')
 
-p.get_transactions().to_sql(con=database_connection, name='Buchungen', if_exists='replace')
+# p.get_transactions().to_sql(con=database_connection, name='Buchungen', if_exists='replace')
